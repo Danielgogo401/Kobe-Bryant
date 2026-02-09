@@ -1,0 +1,67 @@
+# Pure Fitness 自动预约配置文件
+# 请根据你的实际信息填写以下配置
+
+# 登录凭据
+credentials:
+  # 手机号或邮箱
+  username: "your_phone_or_email"
+  # 密码
+  password: "your_password"
+  # 区号 (如 +86)
+  country_code: "+86"
+
+# 预约目标
+booking:
+  # 门店名称关键字 (用于匹配)
+  location_name: "南京西路"
+  # Pure360 门店 location_id (静安嘉里中心/南京西路699号)
+  location_id: 83
+  # 课程名称关键字 (用于匹配课程)
+  class_name: "划船机进阶"
+  # 备选课程名称 (如果主名称匹配不到)
+  class_name_alt: "Rowing"
+  # 目标预约时间 (课程开始时间, 如 "10:00" 或留空表示任意时间)
+  preferred_time: ""
+
+# 定时设置
+schedule:
+  # 每周六执行
+  day_of_week: "saturday"
+  # 登录准备时间 (提前登录)
+  login_time: "08:50"
+  # 抢课时间 (9点整开放预约)
+  book_time: "09:00:00"
+  # 抢课前预加载页面的秒数
+  preload_seconds: 10
+  # 9点后重试次数
+  retry_count: 5
+  # 重试间隔 (秒)
+  retry_interval: 1
+
+# 浏览器设置
+browser:
+  # 浏览器类型: chrome / firefox / edge
+  type: "chrome"
+  # 是否无头模式 (不显示浏览器窗口)
+  headless: false
+  # ChromeDriver 路径 (留空则自动检测)
+  driver_path: ""
+  # 页面加载超时 (秒)
+  page_timeout: 30
+
+# 通知设置 (可选)
+notification:
+  # 是否启用通知
+  enabled: false
+  # 通知方式: bark / webhook / email
+  method: "bark"
+  # Bark Key (iOS Bark App 推送)
+  bark_key: ""
+  # Webhook URL (企业微信/钉钉/飞书等)
+  webhook_url: ""
+
+# Pure360 网站 URL
+urls:
+  base: "https://pure360.pure-fitness.cn"
+  schedule: "https://pure360.pure-fitness.cn/zh-cn/CN?location_id=83"
+  login: "https://pure360.pure-fitness.cn/zh-cn/CN/signin"
