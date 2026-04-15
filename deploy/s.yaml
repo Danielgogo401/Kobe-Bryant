@@ -1,0 +1,83 @@
+# Serverless Devs 部署配置 — 阿里云函数计算 (FC3.0)
+#
+# 使用方式:
+#   1. 安装 Serverless Devs: npm install -g @serverless-devs/s
+#   2. 配置阿里云凭据: s config add
+#   3. 部署: cd deploy && s deploy
+#
+# 注意: 需要先在 FC 控制台设置环境变量 (见 deploy/.env.example)
+#       或通过 s deploy -y 后手动在控制台补齐敏感信息.
+
+edition: 3.0.0
+name: pure-fitness-booking
+access: default  # 对应 s config add 时设置的 access 名
+
+vars:
+  region: cn-shanghai
+
+resources:
+  pure-booking:
+    component: fc3
+    props:
+      region: ${vars.region}
+      functionName: pure-rowing-booking
+      description: "Pure Fitness 划船机进阶课程自动预约 (每周六 09:00)"
+      runtime: python3.10
+      code: ../   # 部署上层目录 (项目根), 包含 index.py + fast/ + deploy/requirements.txt
+      handler: index.handler
+      memorySize: 128
+      timeout: 300  # 5 分钟, 足够从 08:58 等到 09:00:05
+      cpu: 0.35
+      diskSize: 512
+      environmentVariables:
+        # 以下值在 FC 控制台后补齐 (敏感信息不提交 git)
+        PYTHONPATH: /code
+        LOG_LEVEL: INFO
+        TZ: Asia/Shanghai
+        # === 账号 (部署后在控制台设置) ===
+        PURE_USERNAME: ${env(PURE_USERNAME)}
+        PURE_PASSWORD: ${env(PURE_PASSWORD)}
+        # === 预约目标 ===
+        PURE_LOCATION_ID: "83"
+        PURE_CLASS_NAME: 划船机进阶
+        PURE_CLASS_NAME_ALT: Rowing
+        DAYS_AHEAD: "2"
+        TARGET_TIME: "09:00:00.000"
+        # === API 参数 (extract_har.py 生成后填) ===
+        PURE_API_BASE: ${env(PURE_API_BASE)}
+        PURE_LOGIN_ENDPOINT: ${env(PURE_LOGIN_ENDPOINT)}
+        PURE_SCHEDULE_ENDPOINT: ${env(PURE_SCHEDULE_ENDPOINT)}
+        PURE_BOOK_ENDPOINT: ${env(PURE_BOOK_ENDPOINT)}
+        PURE_ME_ENDPOINT: ${env(PURE_ME_ENDPOINT)}
+        PURE_TOKEN_PATH: ${env(PURE_TOKEN_PATH)}
+        PURE_CLASS_LIST_PATH: ${env(PURE_CLASS_LIST_PATH)}
+        PURE_CLASS_ID_FIELD: ${env(PURE_CLASS_ID_FIELD)}
+        PURE_CLASS_NAME_FIELD: ${env(PURE_CLASS_NAME_FIELD)}
+        PURE_CLASS_TIME_FIELD: ${env(PURE_CLASS_TIME_FIELD)}
+        PURE_LOGIN_USERNAME_FIELD: ${env(PURE_LOGIN_USERNAME_FIELD)}
+        PURE_LOGIN_PASSWORD_FIELD: ${env(PURE_LOGIN_PASSWORD_FIELD)}
+        PURE_USER_AGENT: ${env(PURE_USER_AGENT)}
+        PURE_ORIGIN: ${env(PURE_ORIGIN)}
+        PURE_REFERER: ${env(PURE_REFERER)}
+        PURE_BOOK_BODY_TEMPLATE: ${env(PURE_BOOK_BODY_TEMPLATE)}
+        # === Burst 调参 ===
+        BURST_COUNT: "5"
+        BURST_STAGGER_MS: "10"
+        MAX_BURSTS: "3"
+        BURST_INTERVAL_MS: "200"
+        BUSY_WAIT_MS: "50"
+        FIRE_LEAD_MS: "10"
+        BURST_IDEMPOTENT_STATUS: "200,201"
+        # === 通知 (可选) ===
+        BARK_KEY: ${env(BARK_KEY)}
+        WEBHOOK_URL: ${env(WEBHOOK_URL)}
+
+      triggers:
+        - triggerName: weekly-saturday
+          triggerType: timer
+          triggerConfig:
+            # 每周六 08:58:00 触发 (Asia/Shanghai)
+            # FC timer 是分钟级 cron, 函数内部 busy-wait 到 09:00:00.000
+            cronExpression: "0 58 8 ? * SAT"
+            enable: true
+            payload: '{"mode": "book"}'
