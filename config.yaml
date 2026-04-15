@@ -1,67 +1,113 @@
-# Pure Fitness 自动预约配置文件
-# 请根据你的实际信息填写以下配置
+# Pure Fitness 自动预约 — 运行配置
+#
+# 敏感信息（账号密码）通过环境变量注入, 不要写在这里
+# 部署到阿里云 FC 时, 环境变量在 FC 控制台或 s.yaml 里配置
 
-# 登录凭据
-credentials:
-  # 手机号或邮箱
-  username: "your_phone_or_email"
-  # 密码
-  password: "your_password"
-  # 区号 (如 +86)
-  country_code: "+86"
-
+# ===========================================================================
 # 预约目标
+# ===========================================================================
 booking:
-  # 门店名称关键字 (用于匹配)
-  location_name: "南京西路"
-  # Pure360 门店 location_id (静安嘉里中心/南京西路699号)
+  # 门店 location_id (南京西路/静安嘉里中心 = 83)
   location_id: 83
-  # 课程名称关键字 (用于匹配课程)
+  # 门店名称 (用于日志)
+  location_name: "南京西路 (静安嘉里中心)"
+  # 课程名称关键字 (模糊匹配)
   class_name: "划船机进阶"
-  # 备选课程名称 (如果主名称匹配不到)
+  # 备选关键字
   class_name_alt: "Rowing"
-  # 目标预约时间 (课程开始时间, 如 "10:00" 或留空表示任意时间)
+  # 目标课程时间 (留空则取第一个匹配的; 填 "10:00" 则只匹配 10 点那节)
   preferred_time: ""
+  # 提前几天预约 (Pure 规则: 2 天)
+  days_ahead: 2
+  # 目标抢课时间 (Asia/Shanghai)
+  target_time: "09:00:00.000"
 
-# 定时设置
-schedule:
-  # 每周六执行
-  day_of_week: "saturday"
-  # 登录准备时间 (提前登录)
-  login_time: "08:50"
-  # 抢课时间 (9点整开放预约)
-  book_time: "09:00:00"
-  # 抢课前预加载页面的秒数
-  preload_seconds: 10
-  # 9点后重试次数
-  retry_count: 5
-  # 重试间隔 (秒)
-  retry_interval: 1
+# ===========================================================================
+# API 配置 — HAR 抓包后填写
+# ===========================================================================
+api:
+  base_url: "https://pure360.pure-fitness.cn"
+  # 认证方式: bearer | cookie
+  auth_scheme: "bearer"
+  # 连接池大小
+  pool_size: 8
+  # HTTP/2 启用
+  http2: true
+  # 请求超时 (秒)
+  timeout: 5.0
+  connect_timeout: 2.0
 
-# 浏览器设置
-browser:
-  # 浏览器类型: chrome / firefox / edge
-  type: "chrome"
-  # 是否无头模式 (不显示浏览器窗口)
-  headless: false
-  # ChromeDriver 路径 (留空则自动检测)
-  driver_path: ""
-  # 页面加载超时 (秒)
-  page_timeout: 30
+  # 端点 — 从 HAR 提取后填写 (或通过 extract_har.py 自动生成 .env)
+  endpoints:
+    login: "${PURE_LOGIN_ENDPOINT:/api/v1/member/login}"
+    refresh: "${PURE_REFRESH_ENDPOINT:/api/v1/member/refresh}"
+    schedule: "${PURE_SCHEDULE_ENDPOINT:/api/v1/schedule}"
+    book: "${PURE_BOOK_ENDPOINT:/api/v1/booking/create}"
+    me: "${PURE_ME_ENDPOINT:/api/v1/member/me}"
 
-# 通知设置 (可选)
+  # JSON path (点号分隔) — 从 HAR 提取
+  json_paths:
+    token: "${PURE_TOKEN_PATH:data.token}"
+    refresh_token: "${PURE_REFRESH_TOKEN_PATH:data.refresh_token}"
+    token_expires: "${PURE_TOKEN_EXPIRES_PATH:data.expires_in}"
+    member_id: "${PURE_MEMBER_ID_PATH:data.member.id}"
+    class_list: "${PURE_CLASS_LIST_PATH:data.classes}"
+    class_id_field: "${PURE_CLASS_ID_FIELD:id}"
+    class_name_field: "${PURE_CLASS_NAME_FIELD:name}"
+    class_time_field: "${PURE_CLASS_TIME_FIELD:start_time}"
+
+  # 登录 body 字段名 (某些站点叫 phone, 有些叫 username/mobile/email)
+  login_fields:
+    username: "${PURE_LOGIN_USERNAME_FIELD:username}"
+    password: "${PURE_LOGIN_PASSWORD_FIELD:password}"
+
+  # 静态 headers (从 HAR 复制, 包括 User-Agent)
+  static_headers:
+    User-Agent: "${PURE_USER_AGENT:Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36}"
+    Accept: "application/json, text/plain, */*"
+    Accept-Language: "zh-CN,zh;q=0.9,en;q=0.8"
+    X-Requested-With: "XMLHttpRequest"
+    Origin: "${PURE_ORIGIN:https://pure360.pure-fitness.cn}"
+    Referer: "${PURE_REFERER:https://pure360.pure-fitness.cn/zh-cn/CN}"
+
+# ===========================================================================
+# 时序控制
+# ===========================================================================
+timing:
+  # 函数启动后多久开始 warm-up (秒)
+  warmup_delay: 2
+  # Warm ping 间隔 (秒)
+  warm_interval: 15
+  # 发射前多少毫秒进入忙等待
+  busy_wait_ms: 50
+  # 提前量 (抵消 RTT 的一半) 毫秒
+  fire_lead_ms: 10
+  # 是否用 warm ping 响应头动态校准时钟
+  dynamic_time_calibration: true
+
+# ===========================================================================
+# Burst 并发发射
+# ===========================================================================
+burst:
+  # 并发请求数
+  concurrent_requests: 5
+  # burst 内部错峰 (ms)
+  stagger_ms: 10
+  # 哪些状态码表示"未开放, 可重试"
+  retry_on_status: [409, 425, 503]
+  # 最多几轮 burst
+  max_bursts: 3
+  # burst 之间间隔 (ms)
+  burst_interval_ms: 200
+  # 哪些状态码表示"已预约成功, 幂等"
+  idempotent_success_status: [200, 201, 409]
+
+# ===========================================================================
+# 通知
+# ===========================================================================
 notification:
-  # 是否启用通知
-  enabled: false
-  # 通知方式: bark / webhook / email
+  enabled: true
+  # bark | webhook | none
   method: "bark"
-  # Bark Key (iOS Bark App 推送)
-  bark_key: ""
-  # Webhook URL (企业微信/钉钉/飞书等)
-  webhook_url: ""
-
-# Pure360 网站 URL
-urls:
-  base: "https://pure360.pure-fitness.cn"
-  schedule: "https://pure360.pure-fitness.cn/zh-cn/CN?location_id=83"
-  login: "https://pure360.pure-fitness.cn/zh-cn/CN/signin"
+  bark_key: "${BARK_KEY:}"
+  webhook_url: "${WEBHOOK_URL:}"
